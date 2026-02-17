@@ -16,5 +16,5 @@ define('MAIL_FROM_NAME',  'Microfinancial Admin System');
 
 // OTP Settings
 define('OTP_LENGTH',      6);          // 6-digit OTP
-define('OTP_EXPIRY',      300);        // 300 seconds = 5 minutes
+define('OTP_EXPIRY',      60);         // 60 seconds = 1 minute
 define('OTP_RECIPIENT',   'imjesselobina@gmail.com');

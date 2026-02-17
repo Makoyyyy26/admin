@@ -104,7 +104,7 @@ function subArrow($isActive = false) {
     <!-- ═══ Facilities ═══ -->
     <button data-submenu="facilities-submenu" class="mt-3 <?= sidebarBtnClass('facilities', $activePage) ?>">
       <span class="flex items-center gap-2 min-w-0">
-        <span class="<?= sidebarIconWrap('facilities', $activePage) ?>">🏢</span><span class="truncate">Facilities Management</span>
+        <span class="<?= sidebarIconWrap('facilities', $activePage) ?>">🏢</span><span class="truncate">Facilities Reservation</span>
       </span>
       <svg class="<?= sidebarArrowClass('facilities', $activePage) ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
     </button>
@@ -128,8 +128,11 @@ function subArrow($isActive = false) {
       <div class="pl-4 pr-2 py-2 space-y-1 border-l-2 border-gray-100 ml-6">
         <a href="<?= $doc ?>#tab-folders" data-hash="tab-folders" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Department Folders</a>
         <a href="<?= $doc ?>#tab-all" data-hash="tab-all" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> All Documents</a>
-        <a href="<?= $doc ?>#tab-archived" data-hash="tab-archived" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Archived (6mo+)</a>
-        <a href="<?= $doc ?>#tab-retained" data-hash="tab-retained" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Retained (3yr+)</a>
+        <a href="<?= $doc ?>#tab-secure-storage" data-hash="tab-secure-storage" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Secure Storage</a>
+        <a href="<?= $doc ?>#tab-ocr" data-hash="tab-ocr" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> OCR Scanning</a>
+        <a href="<?= $doc ?>#tab-versions" data-hash="tab-versions" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Version Control</a>
+        <a href="<?= $doc ?>#tab-archiving" data-hash="tab-archiving" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Archiving</a>
+        <a href="<?= $doc ?>#tab-access-control" data-hash="tab-access-control" class="sidebar-sublink <?= subLinkClass() ?>"><?= subArrow() ?> Access Control</a>
       </div>
     </div>
 

@@ -507,6 +507,7 @@
           </div>
           <div class="modal-body" id="loan-contract-body"></div>
           <div class="modal-footer">
+            <button class="btn btn-primary" id="btn-download-loan-pdf" style="display:none" onclick="exportLoanContractPDF()">📥 Download PDF</button>
             <button class="btn btn-outline" onclick="closeModal('modal-loan-contract')">Close</button>
           </div>
         </div>
@@ -845,9 +846,13 @@ function renderLoans() {
 }
 
 // ===== View: Loan Contract =====
+let viewLoanContractIdx = null;
+
 function viewLoanContract(idx) {
   const l = loans[idx];
   if (!l) return;
+  viewLoanContractIdx = idx;
+  document.getElementById('btn-download-loan-pdf').style.display = 'inline-flex';
 
   var html = '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
     '<div>' +
@@ -1761,6 +1766,460 @@ function exportPermits(format) {
   ]);
   format === 'csv' ? ExportHelper.exportCSV('Legal_Permits', headers, rows)
     : ExportHelper.exportPDF('Legal_Permits', 'Legal — Permits & Licenses', headers, rows, { landscape: true, subtitle: permits.length + ' records' });
+}
+
+// ═══════════════════════════════════════════════════════
+// LOAN CONTRACT PDF EXPORT
+// ═══════════════════════════════════════════════════════
+function exportLoanContractPDF() {
+  const l = loans[viewLoanContractIdx];
+  if (!l) { Swal.fire({ icon: 'warning', title: 'No Data', text: 'No loan contract selected.', confirmButtonColor: '#059669' }); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 20, marginR = 20, contentW = pageW - marginL - marginR;
+  let y = 20;
+
+  const brandColor = [5, 150, 105];       // #059669
+  const darkColor  = [31, 41, 55];        // #1F2937
+  const grayColor  = [107, 114, 128];     // #6B7280
+  const lightGray  = [229, 231, 235];     // #E5E7EB
+
+  function checkPage(needed) {
+    if (y + needed > pageH - 25) {
+      // Footer on current page
+      drawFooter(doc);
+      doc.addPage();
+      y = 20;
+    }
+  }
+
+  function drawFooter(d) {
+    d.setDrawColor(...lightGray);
+    d.line(marginL, pageH - 18, pageW - marginR, pageH - 18);
+    d.setFont('helvetica', 'normal');
+    d.setFontSize(8);
+    d.setTextColor(...grayColor);
+    d.text('Microfinancial Management System — Confidential', marginL, pageH - 12);
+    d.text('Page ' + d.internal.getCurrentPageInfo().pageNumber, pageW - marginR, pageH - 12, { align: 'right' });
+  }
+
+  function fmtDatePdf(d) {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt)) return d;
+    return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function moneyPdf(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return '₱0.00';
+    return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ─── HEADER BANNER ───
+  doc.setFillColor(...brandColor);
+  doc.rect(0, 0, pageW, 40, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text('LOAN AGREEMENT / CONTRACT', pageW / 2, 18, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Microfinancial Management System', pageW / 2, 27, { align: 'center' });
+  doc.text('Reference: ' + (l.loan_doc_code || '—'), pageW / 2, 34, { align: 'center' });
+
+  y = 50;
+
+  // ─── DOCUMENT INFO ROW ───
+  doc.setFillColor(240, 253, 244); // #F0FDF4
+  doc.roundedRect(marginL, y, contentW, 16, 3, 3, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...grayColor);
+  doc.text('Document Code: ' + (l.loan_doc_code || '—'), marginL + 6, y + 6);
+  doc.text('Status: ' + (l.status ? l.status.replace(/_/g, ' ').toUpperCase() : '—'), marginL + 6, y + 12);
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pageW - marginR - 6, y + 6, { align: 'right' });
+  y += 22;
+
+  // ─── BORROWER SECTION ───
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkColor);
+  doc.text('BORROWER INFORMATION', marginL, y);
+  y += 2;
+  doc.setDrawColor(...brandColor);
+  doc.setLineWidth(0.8);
+  doc.line(marginL, y, marginL + 60, y);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...darkColor);
+  doc.text('Name:', marginL, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text(l.borrower_name || '—', marginL + 30, y);
+  y += 6;
+
+  if (l.borrower_address) {
+    doc.setFont('helvetica', 'normal');
+    doc.text('Address:', marginL, y);
+    doc.setFont('helvetica', 'bold');
+    const addrLines = doc.splitTextToSize(l.borrower_address, contentW - 35);
+    doc.text(addrLines, marginL + 30, y);
+    y += addrLines.length * 5 + 2;
+  }
+  y += 6;
+
+  // ─── LOAN TERMS TABLE ───
+  checkPage(50);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkColor);
+  doc.text('LOAN TERMS', marginL, y);
+  y += 2;
+  doc.setDrawColor(...brandColor);
+  doc.setLineWidth(0.8);
+  doc.line(marginL, y, marginL + 40, y);
+  y += 6;
+
+  const termsData = [
+    ['Loan Amount', moneyPdf(l.loan_amount)],
+    ['Interest Rate', parseFloat(l.interest_rate || 0).toFixed(2) + '% per annum'],
+    ['Loan Term', (l.loan_term_months || 0) + ' months'],
+    ['Repayment Schedule', (l.repayment_schedule || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())],
+    ['Security Type', (l.security_type || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())],
+    ['Penalty Rate', parseFloat(l.penalty_rate || 0).toFixed(2) + '% per month (late payment)']
+  ];
+  if (l.purpose) termsData.push(['Purpose', l.purpose]);
+
+  doc.autoTable({
+    startY: y,
+    head: [],
+    body: termsData,
+    theme: 'plain',
+    margin: { left: marginL, right: marginR },
+    styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3, left: 6, right: 6 }, textColor: darkColor },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 50, textColor: grayColor },
+      1: { fontStyle: 'normal' }
+    },
+    alternateRowStyles: { fillColor: [249, 250, 251] },
+    didDrawPage: function() {}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ─── KEY DATES TABLE ───
+  checkPage(40);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkColor);
+  doc.text('KEY DATES', marginL, y);
+  y += 2;
+  doc.setDrawColor(...brandColor);
+  doc.setLineWidth(0.8);
+  doc.line(marginL, y, marginL + 35, y);
+  y += 6;
+
+  const datesData = [
+    ['Date Signed', fmtDatePdf(l.signed_date)],
+    ['Effective Date', fmtDatePdf(l.effective_date)],
+    ['Maturity Date', fmtDatePdf(l.maturity_date)]
+  ];
+
+  doc.autoTable({
+    startY: y,
+    head: [],
+    body: datesData,
+    theme: 'plain',
+    margin: { left: marginL, right: marginR },
+    styles: { fontSize: 10, cellPadding: { top: 3, bottom: 3, left: 6, right: 6 }, textColor: darkColor },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 50, textColor: grayColor },
+      1: { fontStyle: 'normal' }
+    },
+    alternateRowStyles: { fillColor: [249, 250, 251] }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ─── CONTRACT BODY ───
+  if (l.contract_body) {
+    checkPage(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkColor);
+    doc.text('CONTRACT BODY', marginL, y);
+    y += 2;
+    doc.setDrawColor(...brandColor);
+    doc.setLineWidth(0.8);
+    doc.line(marginL, y, marginL + 45, y);
+    y += 8;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...darkColor);
+    const bodyLines = doc.splitTextToSize(l.contract_body, contentW - 10);
+    const lineHeight = 5;
+
+    for (let i = 0; i < bodyLines.length; i++) {
+      checkPage(lineHeight + 2);
+      doc.text(bodyLines[i], marginL + 5, y);
+      y += lineHeight;
+    }
+    y += 8;
+  }
+
+  // ─── DISCLOSURE STATEMENT ───
+  if (l.disclosure_statement) {
+    checkPage(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...darkColor);
+    doc.text('TRUTH IN LENDING DISCLOSURE', marginL, y);
+    y += 2;
+    doc.setDrawColor(...brandColor);
+    doc.setLineWidth(0.5);
+    doc.line(marginL, y, marginL + 65, y);
+    y += 8;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...darkColor);
+    const discLines = doc.splitTextToSize(l.disclosure_statement, contentW - 10);
+    const lineHeight = 5;
+
+    for (let i = 0; i < discLines.length; i++) {
+      checkPage(lineHeight + 2);
+      doc.text(discLines[i], marginL + 5, y);
+      y += lineHeight;
+    }
+    y += 8;
+  }
+
+  // ─── PROMISSORY NOTE ───
+  if (l.promissory_note) {
+    checkPage(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...darkColor);
+    doc.text('PROMISSORY NOTE', marginL, y);
+    y += 2;
+    doc.setDrawColor(...brandColor);
+    doc.setLineWidth(0.5);
+    doc.line(marginL, y, marginL + 45, y);
+    y += 8;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...darkColor);
+    const noteLines = doc.splitTextToSize(l.promissory_note, contentW - 10);
+    const lineHeight = 5;
+
+    for (let i = 0; i < noteLines.length; i++) {
+      checkPage(lineHeight + 2);
+      doc.text(noteLines[i], marginL + 5, y);
+      y += lineHeight;
+    }
+    y += 8;
+  }
+
+  // ─── ATTORNEY CREDENTIALS & SIGNATURE ───
+  if (l.attorney_name) {
+    checkPage(80);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkColor);
+    doc.text('ATTORNEY CREDENTIALS', marginL, y);
+    y += 2;
+    doc.setDrawColor(...brandColor);
+    doc.setLineWidth(0.8);
+    doc.line(marginL, y, marginL + 55, y);
+    y += 4;
+
+    // Green background box for attorney details
+    const attyBoxH = 42;
+    checkPage(attyBoxH + 10);
+    doc.setFillColor(240, 253, 244); // #F0FDF4
+    doc.setDrawColor(167, 243, 208); // #A7F3D0
+    doc.setLineWidth(0.5);
+    doc.roundedRect(marginL, y, contentW, attyBoxH, 3, 3, 'FD');
+
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(6, 95, 70);       // #065F46
+
+    const col1X = marginL + 8;
+    const col2X = marginL + contentW / 2 + 5;
+    const rowH = 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Name:', col1X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_name || '—', col1X + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRC No:', col2X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_prc || '—', col2X + 22, y);
+    y += rowH;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PTR No:', col1X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_ptr || '—', col1X + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('IBP No:', col2X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_ibp || '—', col2X + 22, y);
+    y += rowH;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Roll No:', col1X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_roll || '—', col1X + 22, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('MCLE No:', col2X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.attorney_mcle || '—', col2X + 25, y);
+    y += rowH;
+
+    y += (attyBoxH - 3 * rowH - 8) + 4;
+
+    // ─── ATTORNEY SIGNATURE ───
+    checkPage(50);
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...darkColor);
+    doc.text('Attorney Signature:', marginL, y);
+    y += 4;
+
+    if (l.attorney_signature) {
+      try {
+        let sigData = l.attorney_signature;
+        if (!sigData.startsWith('data:')) {
+          sigData = 'data:image/png;base64,' + sigData;
+        }
+        doc.addImage(sigData, 'PNG', marginL, y, 60, 25);
+        y += 28;
+      } catch (e) {
+        console.warn('Could not add attorney signature image:', e);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(...grayColor);
+        doc.text('[Signature on file]', marginL, y + 8);
+        y += 14;
+      }
+    } else {
+      // Draw a signature line
+      doc.setDrawColor(...lightGray);
+      doc.setLineWidth(0.5);
+      doc.line(marginL, y + 15, marginL + 70, y + 15);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...grayColor);
+      doc.text('Signature Over Printed Name', marginL, y + 20);
+      y += 24;
+    }
+
+    // Attorney printed name
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...darkColor);
+    doc.text(l.attorney_name, marginL, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...grayColor);
+    doc.text('Counsel', marginL, y);
+    y += 10;
+  }
+
+  // ─── NOTARY SECTION ───
+  if (l.notary_name) {
+    checkPage(50);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkColor);
+    doc.text('ACKNOWLEDGMENT / NOTARIAL CERTIFICATE', marginL, y);
+    y += 2;
+    doc.setDrawColor(...brandColor);
+    doc.setLineWidth(0.8);
+    doc.line(marginL, y, marginL + 80, y);
+    y += 4;
+
+    // Yellow background box for notarial section
+    const notaryBoxH = 38;
+    checkPage(notaryBoxH + 10);
+    doc.setFillColor(255, 251, 235); // #FFFBEB
+    doc.setDrawColor(253, 230, 138); // #FDE68A
+    doc.setLineWidth(0.5);
+    doc.roundedRect(marginL, y, contentW, notaryBoxH, 3, 3, 'FD');
+
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(146, 64, 14);     // #92400E
+
+    const notCol1 = marginL + 8;
+    const notCol2 = marginL + contentW / 2 + 5;
+    const nRowH = 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Notary Public:', notCol1, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.notary_name || '—', notCol1 + 35, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Commission:', notCol2, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.notary_commission || '—', notCol2 + 30, y);
+    y += nRowH;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Doc No:', notCol1, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.doc_series_no || '—', notCol1 + 35, y);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Page No:', notCol2, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.doc_page_no || '—', notCol2 + 30, y);
+    y += nRowH;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Book No:', notCol1, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(l.doc_book_no || '—', notCol1 + 35, y);
+    y += nRowH;
+
+    y += (notaryBoxH - 3 * nRowH - 8) + 6;
+  }
+
+  // ─── FOOTER ON LAST PAGE ───
+  drawFooter(doc);
+
+  // Save the file
+  const filename = 'Loan_Contract_' + (l.loan_doc_code || 'DRAFT').replace(/[^A-Za-z0-9_-]/g, '_') + '.pdf';
+  doc.save(filename);
+
+  Swal.fire({
+    icon: 'success',
+    title: 'PDF Downloaded',
+    text: 'Loan contract PDF has been saved as ' + filename,
+    confirmButtonColor: '#059669',
+    timer: 3000,
+    showConfirmButton: false
+  });
 }
 </script>
 </body>

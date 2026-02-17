@@ -84,6 +84,7 @@
         <div class="stat-card"><div class="stat-icon amber">⏳</div><div class="stat-info"><div class="stat-value" id="stat-pending">0</div><div class="stat-label">Pending Reservations</div></div></div>
         <div class="stat-card"><div class="stat-icon purple">⭐</div><div class="stat-info"><div class="stat-value" id="stat-vip">0</div><div class="stat-label">VIP Reservations</div></div></div>
         <div class="stat-card"><div class="stat-icon red">🚨</div><div class="stat-info"><div class="stat-value" id="stat-emergency">0</div><div class="stat-label">Emergency Meetings</div></div></div>
+        <div class="stat-card"><div class="stat-icon amber">🔧</div><div class="stat-info"><div class="stat-value" id="stat-malfunction">0</div><div class="stat-label">Equipment Malfunction</div></div></div>
       </div>
 
 
@@ -258,15 +259,145 @@
       <!-- TAB: Maintenance                                    -->
       <!-- ═══════════════════════════════════════════════════ -->
       <div id="tab-maintenance" class="tab-content">
+
+        <!-- Maintenance Stat Cards -->
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-icon red">🔧</div><div class="stat-info"><div class="stat-value" id="stat-maint-open">0</div><div class="stat-label">Open Tickets</div></div></div>
+          <div class="stat-card"><div class="stat-icon blue">⚙️</div><div class="stat-info"><div class="stat-value" id="stat-maint-progress">0</div><div class="stat-label">In Progress</div></div></div>
+          <div class="stat-card"><div class="stat-icon amber">⚠️</div><div class="stat-info"><div class="stat-value" id="stat-maint-equipment">0</div><div class="stat-label">Equipment Malfunction</div></div></div>
+          <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-value" id="stat-maint-resolved">0</div><div class="stat-label">Resolved</div></div></div>
+        </div>
+
         <div class="card">
           <div class="card-header">
-            <span class="card-title">Maintenance Requests</span>
-            <div style="display:flex;gap:8px">
+            <span class="card-title">🛠️ Maintenance Requests</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <button class="btn-export btn-export-pdf btn-export-sm" onclick="exportMaintenance('pdf')" title="Export PDF">📄 PDF</button>
               <button class="btn-export btn-export-csv btn-export-sm" onclick="exportMaintenance('csv')" title="Export CSV">📊 CSV</button>
+              <select id="maint-filter-status" class="form-input" style="width:auto;padding:6px 12px;font-size:12px" onchange="renderMaintenance()">
+                <option value="">All Status</option>
+                <option value="open">🔴 Open</option>
+                <option value="in_progress">🔵 In Progress</option>
+                <option value="resolved">🟢 Resolved</option>
+                <option value="closed">⚫ Closed</option>
+              </select>
+              <select id="maint-filter-type" class="form-input" style="width:auto;padding:6px 12px;font-size:12px" onchange="renderMaintenance()">
+                <option value="">All Types</option>
+                <option value="equipment">🔧 Equipment Malfunction</option>
+                <option value="electrical">⚡ Electrical</option>
+                <option value="plumbing">🚿 Plumbing</option>
+                <option value="hvac">❄️ HVAC</option>
+                <option value="structural">🏗️ Structural</option>
+                <option value="cleaning">🧹 Cleaning</option>
+                <option value="other">📋 Other</option>
+              </select>
+              <select id="maint-filter-priority" class="form-input" style="width:auto;padding:6px 12px;font-size:12px" onchange="renderMaintenance()">
+                <option value="">All Priority</option>
+                <option value="critical">🔴 Critical</option>
+                <option value="high">🟠 High</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="low">🟢 Low</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openMaintenanceModal()">+ Report Malfunction</button>
             </div>
           </div>
           <div class="card-body" id="maintenance-body"></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- MODAL: New Maintenance Request                      -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div id="modal-maintenance" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-maintenance')">
+        <div class="modal" style="max-width:600px">
+          <div class="modal-header">
+            <span class="modal-title" id="modal-maint-title">🔧 Report Equipment Malfunction</span>
+            <button class="modal-close" onclick="closeModal('modal-maintenance')">&times;</button>
+          </div>
+          <div class="modal-body">
+
+            <div style="background:#FEF3C7;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;color:#92400E;border:1px solid #FDE68A">
+              ⚠️ <strong>Report a malfunction or maintenance issue.</strong> Critical and high-priority issues will be flagged immediately. Equipment marked as malfunctioning will be taken offline until resolved.
+            </div>
+
+            <div class="form-control">
+              <label>Issue Type</label>
+              <select class="form-input" id="maint-issue-type" onchange="toggleEquipmentField()">
+                <option value="equipment" selected>🔧 Equipment Malfunction</option>
+                <option value="electrical">⚡ Electrical</option>
+                <option value="plumbing">🚿 Plumbing</option>
+                <option value="hvac">❄️ HVAC</option>
+                <option value="structural">🏗️ Structural</option>
+                <option value="cleaning">🧹 Cleaning</option>
+                <option value="other">📋 Other</option>
+              </select>
+            </div>
+
+            <div class="form-control">
+              <label>Facility / Location</label>
+              <select class="form-input" id="maint-facility" onchange="loadFacilityEquipment()">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <div class="form-control" id="maint-equipment-group">
+              <label>Malfunctioning Equipment</label>
+              <select class="form-input" id="maint-equipment">
+                <option value="">— Select equipment —</option>
+                <!-- Populated dynamically based on selected facility -->
+              </select>
+              <span style="font-size:11px;color:#9CA3AF;margin-top:4px;display:block">Select the specific equipment that is malfunctioning. It will be marked as unavailable until repaired.</span>
+            </div>
+
+            <div class="form-control">
+              <label>Priority</label>
+              <select class="form-input" id="maint-priority">
+                <option value="low">🟢 Low — Minor issue, can wait</option>
+                <option value="medium" selected>🟡 Medium — Should be fixed soon</option>
+                <option value="high">🟠 High — Urgent, affects operations</option>
+                <option value="critical">🔴 Critical — Immediate attention needed</option>
+              </select>
+            </div>
+
+            <div class="form-control">
+              <label>Description of Issue</label>
+              <textarea class="form-input" id="maint-description" rows="4" placeholder="Describe the malfunction in detail: What happened? When did it start? Any error indicators or visible damage?"></textarea>
+            </div>
+
+            <div class="form-control">
+              <label>Assign To (Optional)</label>
+              <input type="text" class="form-input" id="maint-assigned" placeholder="Name of technician or maintenance team">
+            </div>
+
+            <div class="form-control" id="maint-facility-offline-group" style="display:none">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="maint-set-offline" style="accent-color:#DC2626;width:18px;height:18px">
+                <span style="font-size:13px;font-weight:600;color:#991B1B">⚠️ Take facility offline (set to Maintenance mode)</span>
+              </label>
+              <span style="font-size:11px;color:#9CA3AF;margin-top:4px;display:block">This will prevent new bookings for this facility until the issue is resolved.</span>
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-maintenance')">Cancel</button>
+            <button class="btn btn-primary" id="btn-submit-maintenance" onclick="submitMaintenance()">🔧 Submit Report</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- MODAL: Maintenance Detail / Update                  -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div id="modal-maint-detail" class="modal-overlay" onclick="if(event.target===this)closeModal('modal-maint-detail')">
+        <div class="modal" style="max-width:560px">
+          <div class="modal-header">
+            <span class="modal-title" id="modal-maint-detail-title">Maintenance Details</span>
+            <button class="modal-close" onclick="closeModal('modal-maint-detail')">&times;</button>
+          </div>
+          <div class="modal-body" id="modal-maint-detail-body"></div>
+          <div class="modal-footer" id="modal-maint-detail-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-maint-detail')">Close</button>
+          </div>
         </div>
       </div>
 
@@ -468,6 +599,7 @@ async function loadData() {
     renderMaintenance();
     populateFacilityDropdown();
     populateEquipmentCheckboxes();
+    populateMaintenanceFacilityDropdown();
     await loadCalendarEvents();
   } catch (err) {
     console.error('Failed to load facilities data:', err);
@@ -504,6 +636,12 @@ function renderStats() {
     r.reservation_type === 'emergency' && r.status === 'approved'
   ).length;
   document.getElementById('stat-emergency').textContent = emergencyCount;
+
+  // Malfunction: equipment maintenance tickets that are open or in_progress
+  const malfunctionCount = maintenance.filter(m =>
+    m.issue_type === 'equipment' && (m.status === 'open' || m.status === 'in_progress')
+  ).length;
+  document.getElementById('stat-malfunction').textContent = malfunctionCount;
 }
 
 // ───── Render Rooms ─────
@@ -729,43 +867,358 @@ function renderEquipment() {
 // ───── Render Maintenance ─────
 function renderMaintenance() {
   const body = document.getElementById('maintenance-body');
-  if (!maintenance.length) {
+  const statusFilter = document.getElementById('maint-filter-status')?.value || '';
+  const typeFilter = document.getElementById('maint-filter-type')?.value || '';
+  const priorityFilter = document.getElementById('maint-filter-priority')?.value || '';
+
+  // Update maintenance stat cards
+  const openCount = maintenance.filter(m => m.status === 'open').length;
+  const progressCount = maintenance.filter(m => m.status === 'in_progress').length;
+  const equipCount = maintenance.filter(m => m.issue_type === 'equipment' && (m.status === 'open' || m.status === 'in_progress')).length;
+  const resolvedCount = maintenance.filter(m => m.status === 'resolved' || m.status === 'closed').length;
+
+  const el = (id) => document.getElementById(id);
+  if (el('stat-maint-open')) el('stat-maint-open').textContent = openCount;
+  if (el('stat-maint-progress')) el('stat-maint-progress').textContent = progressCount;
+  if (el('stat-maint-equipment')) el('stat-maint-equipment').textContent = equipCount;
+  if (el('stat-maint-resolved')) el('stat-maint-resolved').textContent = resolvedCount;
+
+  let filtered = maintenance;
+  if (statusFilter) filtered = filtered.filter(m => m.status === statusFilter);
+  if (typeFilter) filtered = filtered.filter(m => m.issue_type === typeFilter);
+  if (priorityFilter) filtered = filtered.filter(m => m.priority === priorityFilter);
+
+  if (!filtered.length) {
     body.innerHTML = '<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">🔧</div>'
-      + '<div style="font-weight:600;color:#1F2937;margin-bottom:4px">No pending maintenance requests</div>'
-      + '<div style="font-size:13px;color:#9CA3AF">All facilities are operational. Submit a request when needed.</div></div>';
+      + '<div style="font-weight:600;color:#1F2937;margin-bottom:4px">No maintenance requests found</div>'
+      + '<div style="font-size:13px;color:#9CA3AF">All facilities and equipment are operational. Click "Report Malfunction" to submit a new request.</div></div>';
     return;
   }
 
   const priBadge = (p) => {
     const pl = (p || '').toLowerCase();
-    if (pl === 'high' || pl === 'urgent') return '<span class="badge badge-red">' + escHtml(p) + '</span>';
-    if (pl === 'medium' || pl === 'normal') return '<span class="badge badge-amber">' + escHtml(p) + '</span>';
+    if (pl === 'critical') return '<span class="badge badge-red">🔴 Critical</span>';
+    if (pl === 'high') return '<span class="badge badge-red">🟠 High</span>';
+    if (pl === 'medium') return '<span class="badge badge-amber">🟡 Medium</span>';
+    if (pl === 'low') return '<span class="badge badge-green">🟢 Low</span>';
     return '<span class="badge badge-gray">' + escHtml(p) + '</span>';
   };
 
   const stBadge = (s) => {
     const sl = (s || '').toLowerCase();
-    if (sl === 'open' || sl === 'pending') return '<span class="badge badge-amber">' + escHtml(s) + '</span>';
-    if (sl === 'in_progress' || sl === 'in progress') return '<span class="badge badge-blue">In Progress</span>';
-    if (sl === 'resolved' || sl === 'completed') return '<span class="badge badge-green">' + escHtml(s) + '</span>';
+    if (sl === 'open') return '<span class="badge badge-red">Open</span>';
+    if (sl === 'in_progress') return '<span class="badge badge-blue">In Progress</span>';
+    if (sl === 'resolved') return '<span class="badge badge-green">Resolved</span>';
+    if (sl === 'closed') return '<span class="badge badge-gray">Closed</span>';
     return '<span class="badge badge-gray">' + escHtml(s) + '</span>';
   };
 
+  const issueIcon = (t) => {
+    const icons = { equipment: '🔧', electrical: '⚡', plumbing: '🚿', hvac: '❄️', structural: '🏗️', cleaning: '🧹' };
+    return (icons[t] || '📋') + ' ' + escHtml((t || 'other').replace(/_/g, ' '));
+  };
+
   body.innerHTML = '<table class="data-table"><thead><tr>'
-    + '<th>Ticket</th><th>Facility</th><th>Issue</th><th>Priority</th><th>Status</th><th>Reported By</th><th>Date</th>'
+    + '<th>Ticket</th><th>Facility</th><th>Equipment</th><th>Issue Type</th><th>Description</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Reported By</th><th>Date</th><th>Actions</th>'
     + '</tr></thead><tbody>'
-    + maintenance.map(m =>
-      '<tr>'
-      + '<td style="font-weight:600;font-size:12px">' + escHtml(m.ticket_number || m.maintenance_id || '') + '</td>'
-      + '<td style="font-weight:600">' + escHtml(m.facility_name || '') + '</td>'
-      + '<td>' + escHtml(m.issue || m.description || '') + '</td>'
-      + '<td>' + priBadge(m.priority || '') + '</td>'
-      + '<td>' + stBadge(m.status || '') + '</td>'
-      + '<td>' + escHtml(m.reported_by || '') + '</td>'
-      + '<td style="font-size:12px">' + formatDate(m.reported_date || m.created_at || '') + '</td>'
-      + '</tr>'
-    ).join('')
+    + filtered.map(m => {
+      const mId = m.maintenance_id;
+      let actions = '';
+      if (m.status === 'open') {
+        actions = '<div style="display:flex;gap:4px">'
+          + '<button class="btn btn-primary btn-sm" title="Start Work" onclick="updateMaintenanceStatus(' + mId + ',\'in_progress\')">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>'
+          + '<button class="btn btn-outline btn-sm" title="View Details" onclick="showMaintenanceDetail(' + mId + ')">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+          + '</div>';
+      } else if (m.status === 'in_progress') {
+        actions = '<div style="display:flex;gap:4px">'
+          + '<button class="btn btn-primary btn-sm" title="Mark Resolved" onclick="resolveMaintenancePrompt(' + mId + ')">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="btn btn-outline btn-sm" title="View Details" onclick="showMaintenanceDetail(' + mId + ')">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
+          + '</div>';
+      } else {
+        actions = '<button class="btn btn-outline btn-sm" title="View Details" onclick="showMaintenanceDetail(' + mId + ')">'
+          + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>';
+      }
+
+      return '<tr>'
+        + '<td style="font-weight:600;font-size:12px">' + escHtml(m.ticket_number || '') + '</td>'
+        + '<td style="font-weight:600">' + escHtml(m.facility_name || '') + '</td>'
+        + '<td>' + (m.equipment_name ? '<span style="color:#991B1B;font-weight:600">⚠️ ' + escHtml(m.equipment_name) + '</span>' : '<span style="color:#9CA3AF">—</span>') + '</td>'
+        + '<td style="font-size:12px">' + issueIcon(m.issue_type) + '</td>'
+        + '<td style="max-width:200px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(m.description || '') + '">' + escHtml(m.description || '') + '</div></td>'
+        + '<td>' + priBadge(m.priority) + '</td>'
+        + '<td>' + stBadge(m.status) + '</td>'
+        + '<td>' + escHtml(m.assigned_to || '—') + '</td>'
+        + '<td style="font-size:12px">' + escHtml(m.reported_by_name || '') + '</td>'
+        + '<td style="font-size:12px">' + formatDate(m.created_at || '') + '</td>'
+        + '<td>' + actions + '</td>'
+        + '</tr>';
+    }).join('')
     + '</tbody></table>';
+}
+
+// ───── Maintenance Modal Helpers ─────
+function toggleEquipmentField() {
+  const issueType = document.getElementById('maint-issue-type').value;
+  const equipGroup = document.getElementById('maint-equipment-group');
+  const offlineGroup = document.getElementById('maint-facility-offline-group');
+  equipGroup.style.display = issueType === 'equipment' ? '' : 'none';
+
+  // Show "take offline" option for critical/high priority or equipment issues
+  const priority = document.getElementById('maint-priority').value;
+  offlineGroup.style.display = (priority === 'critical' || priority === 'high') ? '' : 'none';
+}
+
+function loadFacilityEquipment() {
+  const facId = document.getElementById('maint-facility').value;
+  const equipSel = document.getElementById('maint-equipment');
+  const facEquip = equipment.filter(e => String(e.facility_id) === String(facId) || !e.facility_id);
+
+  equipSel.innerHTML = '<option value="">— Select equipment —</option>'
+    + facEquip.map(e => '<option value="' + e.equipment_id + '">' + escHtml(e.name || e.equipment_name || '') + ' (' + escHtml(e.condition_status || 'unknown') + ')</option>').join('');
+}
+
+function populateMaintenanceFacilityDropdown() {
+  const sel = document.getElementById('maint-facility');
+  if (!sel) return;
+  sel.innerHTML = rooms.map(r => '<option value="' + r.facility_id + '">' + escHtml(r.name) + '</option>').join('');
+  loadFacilityEquipment();
+}
+
+function openMaintenanceModal() {
+  // Reset form
+  document.getElementById('maint-issue-type').value = 'equipment';
+  document.getElementById('maint-priority').value = 'medium';
+  document.getElementById('maint-description').value = '';
+  document.getElementById('maint-assigned').value = '';
+  document.getElementById('maint-set-offline').checked = false;
+  document.getElementById('modal-maint-title').textContent = '🔧 Report Equipment Malfunction';
+
+  populateMaintenanceFacilityDropdown();
+  toggleEquipmentField();
+  openModal('modal-maintenance');
+}
+
+// Listen for priority change to toggle offline option
+document.getElementById('maint-priority')?.addEventListener('change', function() {
+  const offlineGroup = document.getElementById('maint-facility-offline-group');
+  offlineGroup.style.display = (this.value === 'critical' || this.value === 'high') ? '' : 'none';
+});
+
+async function submitMaintenance() {
+  const issueType = document.getElementById('maint-issue-type').value;
+  const facilityId = document.getElementById('maint-facility').value;
+  const equipmentId = document.getElementById('maint-equipment').value;
+  const priority = document.getElementById('maint-priority').value;
+  const description = document.getElementById('maint-description').value.trim();
+  const assignedTo = document.getElementById('maint-assigned').value.trim();
+  const setOffline = document.getElementById('maint-set-offline').checked;
+
+  if (!description) {
+    return Swal.fire({ icon: 'warning', title: 'Missing Field', text: 'Please describe the issue in detail.', confirmButtonColor: '#059669' });
+  }
+
+  if (issueType === 'equipment' && !equipmentId) {
+    return Swal.fire({ icon: 'warning', title: 'Missing Field', text: 'Please select the malfunctioning equipment.', confirmButtonColor: '#059669' });
+  }
+
+  const priorityLabels = { low: '🟢 Low', medium: '🟡 Medium', high: '🟠 High', critical: '🔴 Critical' };
+  const confirmResult = await Swal.fire({
+    title: 'Submit Maintenance Report?',
+    html: '<div style="text-align:left;font-size:13px;line-height:1.8">'
+      + '<b>Type:</b> ' + escHtml(issueType.replace(/_/g, ' ')) + '<br>'
+      + '<b>Priority:</b> ' + (priorityLabels[priority] || priority) + '<br>'
+      + (equipmentId ? '<b>Equipment:</b> Will be marked as <span style="color:#DC2626;font-weight:700">Needs Repair</span><br>' : '')
+      + (setOffline ? '<b>⚠️ Facility will be taken OFFLINE</b><br>' : '')
+      + '</div>',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, Submit Report',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#DC2626',
+    cancelButtonColor: '#6B7280'
+  });
+  if (!confirmResult.isConfirmed) return;
+
+  try {
+    const res = await fetch(API + '?action=create_maintenance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        facility_id: facilityId,
+        equipment_id: equipmentId || null,
+        issue_type: issueType,
+        priority: priority,
+        description: description,
+        assigned_to: assignedTo || null,
+        set_facility_maintenance: setOffline
+      })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Maintenance Report Submitted!',
+        html: '<div style="text-align:left;font-size:14px;line-height:1.8">'
+          + '<b>Ticket:</b> ' + escHtml(result.ticket_number || 'N/A') + '<br>'
+          + '<b>Status:</b> Open — awaiting action<br>'
+          + (equipmentId ? '<b>Equipment:</b> Marked as needs repair (taken offline)<br>' : '')
+          + (setOffline ? '<b>Facility:</b> Set to maintenance mode<br>' : '')
+          + '</div>',
+        confirmButtonColor: '#059669'
+      });
+      closeModal('modal-maintenance');
+      await loadData();
+      // Switch to maintenance tab
+      switchSection('tab-maintenance', document.querySelector('[data-section="tab-maintenance"]'));
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error', text: result.message || 'Failed to submit report.', confirmButtonColor: '#059669' });
+    }
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: 'Error', text: 'Network error. Please try again.', confirmButtonColor: '#059669' });
+  }
+}
+
+// ───── Update Maintenance Status ─────
+async function updateMaintenanceStatus(id, newStatus) {
+  const labels = { in_progress: 'Start Work', resolved: 'Mark as Resolved', closed: 'Close Ticket' };
+  const confirmResult = await Swal.fire({
+    title: labels[newStatus] || 'Update Status',
+    text: newStatus === 'in_progress'
+      ? 'This will mark the ticket as In Progress. The maintenance team is now working on this issue.'
+      : 'Update the maintenance ticket status.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, ' + (labels[newStatus] || 'Update'),
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#059669',
+    cancelButtonColor: '#6B7280'
+  });
+  if (!confirmResult.isConfirmed) return;
+
+  try {
+    const res = await fetch(API + '?action=update_maintenance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maintenance_id: id, status: newStatus })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      await Swal.fire({ icon: 'success', title: 'Updated!', text: 'Maintenance ticket status updated.', confirmButtonColor: '#059669' });
+      await loadData();
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error', text: result.message || 'Failed to update.', confirmButtonColor: '#059669' });
+    }
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: 'Error', text: 'Network error.', confirmButtonColor: '#059669' });
+  }
+}
+
+// ───── Resolve Maintenance with Notes ─────
+async function resolveMaintenancePrompt(id) {
+  const { value: notes } = await Swal.fire({
+    title: '✅ Resolve Maintenance Ticket',
+    html: '<div style="text-align:left;font-size:13px;margin-bottom:12px;color:#4B5563">Provide resolution details. The equipment will be restored to service and the facility will be set back to available.</div>',
+    input: 'textarea',
+    inputPlaceholder: 'Describe what was done to fix the issue...',
+    inputAttributes: { rows: 4 },
+    showCancelButton: true,
+    confirmButtonText: '✅ Mark as Resolved',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#059669',
+    cancelButtonColor: '#6B7280',
+    inputValidator: (value) => {
+      if (!value.trim()) return 'Please provide resolution notes.';
+    }
+  });
+
+  if (!notes) return;
+
+  try {
+    const res = await fetch(API + '?action=update_maintenance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maintenance_id: id, status: 'resolved', resolution_notes: notes })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Resolved!',
+        html: 'Maintenance ticket resolved.<br>Equipment restored to service. Facility set to available.',
+        confirmButtonColor: '#059669'
+      });
+      await loadData();
+    } else {
+      Swal.fire({ icon: 'error', title: 'Error', text: result.message || 'Failed to resolve.', confirmButtonColor: '#059669' });
+    }
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: 'Error', text: 'Network error.', confirmButtonColor: '#059669' });
+  }
+}
+
+// ───── Show Maintenance Detail ─────
+function showMaintenanceDetail(id) {
+  const m = maintenance.find(x => x.maintenance_id == id);
+  if (!m) return;
+
+  const issueIcons = { equipment: '🔧', electrical: '⚡', plumbing: '🚿', hvac: '❄️', structural: '🏗️', cleaning: '🧹', other: '📋' };
+  const priBg = { critical: '#FEE2E2', high: '#FFEDD5', medium: '#FEF3C7', low: '#D1FAE5' };
+  const priColor = { critical: '#991B1B', high: '#9A3412', medium: '#92400E', low: '#065F46' };
+  const stBg = { open: '#FEE2E2', in_progress: '#DBEAFE', resolved: '#D1FAE5', closed: '#F3F4F6' };
+  const stColor = { open: '#991B1B', in_progress: '#1E40AF', resolved: '#065F46', closed: '#374151' };
+
+  document.getElementById('modal-maint-detail-title').textContent = '🔧 ' + (m.ticket_number || 'Maintenance Detail');
+
+  let html = '<div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">'
+      + '<span style="background:' + (priBg[m.priority] || '#F3F4F6') + ';color:' + (priColor[m.priority] || '#374151') + ';padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700">'
+        + (m.priority || 'medium').toUpperCase() + ' PRIORITY</span>'
+      + '<span style="background:' + (stBg[m.status] || '#F3F4F6') + ';color:' + (stColor[m.status] || '#374151') + ';padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700">'
+        + (m.status || '').replace(/_/g, ' ').toUpperCase() + '</span>'
+    + '</div>'
+    + '<table style="width:100%;font-size:13px;border-collapse:collapse">'
+      + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280;width:140px">🎫 Ticket</td><td style="padding:8px 0;color:#1F2937;font-weight:600">' + escHtml(m.ticket_number || '') + '</td></tr>'
+      + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">📍 Facility</td><td style="padding:8px 0;color:#1F2937">' + escHtml(m.facility_name || '') + '</td></tr>'
+      + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">' + (issueIcons[m.issue_type] || '📋') + ' Issue Type</td><td style="padding:8px 0;color:#1F2937">' + escHtml((m.issue_type || '').replace(/_/g, ' ')) + '</td></tr>';
+
+  if (m.equipment_name) {
+    html += '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">🔧 Equipment</td><td style="padding:8px 0;color:#DC2626;font-weight:600">⚠️ ' + escHtml(m.equipment_name) + ' (Malfunction)</td></tr>';
+  }
+
+  html += '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280;vertical-align:top">📝 Description</td><td style="padding:8px 0;color:#1F2937">' + escHtml(m.description || '') + '</td></tr>'
+    + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">👤 Reported By</td><td style="padding:8px 0;color:#1F2937">' + escHtml(m.reported_by_name || '') + '</td></tr>'
+    + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">🛠️ Assigned To</td><td style="padding:8px 0;color:#1F2937">' + escHtml(m.assigned_to || 'Unassigned') + '</td></tr>'
+    + '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">📅 Reported</td><td style="padding:8px 0;color:#1F2937">' + formatDate(m.created_at || '') + '</td></tr>';
+
+  if (m.resolved_at) {
+    html += '<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 0;font-weight:600;color:#6B7280">✅ Resolved</td><td style="padding:8px 0;color:#065F46">' + formatDate(m.resolved_at) + '</td></tr>';
+  }
+  if (m.resolution_notes) {
+    html += '<tr><td style="padding:8px 0;font-weight:600;color:#6B7280;vertical-align:top">📋 Resolution</td><td style="padding:8px 0;color:#065F46;font-weight:500">' + escHtml(m.resolution_notes) + '</td></tr>';
+  }
+
+  html += '</table></div>';
+
+  document.getElementById('modal-maint-detail-body').innerHTML = html;
+
+  // Update footer actions based on status
+  const footer = document.getElementById('modal-maint-detail-footer');
+  let footerHtml = '<button class="btn btn-outline" onclick="closeModal(\'modal-maint-detail\')">Close</button>';
+  if (m.status === 'open') {
+    footerHtml += ' <button class="btn btn-primary" onclick="closeModal(\'modal-maint-detail\');updateMaintenanceStatus(' + m.maintenance_id + ',\'in_progress\')">▶ Start Work</button>';
+  } else if (m.status === 'in_progress') {
+    footerHtml += ' <button class="btn btn-primary" onclick="closeModal(\'modal-maint-detail\');resolveMaintenancePrompt(' + m.maintenance_id + ')">✅ Mark Resolved</button>';
+  }
+  footer.innerHTML = footerHtml;
+
+  openModal('modal-maint-detail');
 }
 
 // ───── Calendar ─────

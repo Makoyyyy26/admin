@@ -226,12 +226,110 @@ switch ($action) {
     /* ───── Maintenance ───── */
     case 'list_maintenance':
         $rows = getDB()->query("SELECT m.*, f.name AS facility_name,
-            CONCAT(u.first_name,' ',u.last_name) AS reported_by_name
+            CONCAT(u.first_name,' ',u.last_name) AS reported_by_name,
+            e.name AS equipment_name
             FROM facility_maintenance m
             JOIN facilities f ON m.facility_id = f.facility_id
             JOIN users u ON m.reported_by = u.user_id
-            ORDER BY m.created_at DESC")->fetchAll();
+            LEFT JOIN facility_equipment e ON m.equipment_id = e.equipment_id
+            ORDER BY
+              CASE m.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'resolved' THEN 2 WHEN 'closed' THEN 3 END,
+              CASE m.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END,
+              m.created_at DESC")->fetchAll();
         jsonResponse(['data' => $rows]);
+
+    case 'create_maintenance':
+        $d = readJsonBody();
+        $ticket = 'MNT-' . date('Y') . '-' . str_pad(random_int(1,999999),6,'0',STR_PAD_LEFT);
+        $userId = $_SESSION['user']['user_id'] ?? ($d['reported_by'] ?? 1);
+        if (!is_numeric($userId)) $userId = 1;
+
+        $stmt = getDB()->prepare("INSERT INTO facility_maintenance
+            (ticket_number, facility_id, equipment_id, reported_by, issue_type, priority, description, status, assigned_to)
+            VALUES (?,?,?,?,?,?,?,'open',?)");
+        $equipId = !empty($d['equipment_id']) && is_numeric($d['equipment_id']) ? intval($d['equipment_id']) : null;
+        $stmt->execute([
+            $ticket,
+            intval($d['facility_id']),
+            $equipId,
+            intval($userId),
+            $d['issue_type'] ?? 'equipment',
+            $d['priority'] ?? 'medium',
+            $d['description'] ?? '',
+            $d['assigned_to'] ?? null
+        ]);
+        $maintId = getDB()->lastInsertId();
+
+        // If equipment malfunction, mark equipment condition as needs_repair
+        if ($equipId) {
+            getDB()->prepare("UPDATE facility_equipment SET condition_status = 'needs_repair', is_available = 0 WHERE equipment_id = ?")->execute([$equipId]);
+        }
+
+        // If critical/high priority, optionally set facility to maintenance status
+        if (in_array($d['priority'] ?? '', ['critical', 'high']) && !empty($d['set_facility_maintenance'])) {
+            getDB()->prepare("UPDATE facilities SET status = 'maintenance' WHERE facility_id = ?")->execute([intval($d['facility_id'])]);
+        }
+
+        logAudit('facilities', 'CREATE_MAINTENANCE', 'facility_maintenance', $maintId, null, [
+            'ticket_number' => $ticket, 'facility_id' => $d['facility_id'], 'equipment_id' => $equipId, 'issue_type' => $d['issue_type'] ?? 'equipment'
+        ]);
+        jsonResponse(['success' => true, 'ticket_number' => $ticket, 'maintenance_id' => $maintId], 201);
+
+    case 'update_maintenance':
+        $d = readJsonBody();
+        $maintId = intval($d['maintenance_id'] ?? 0);
+        $newStatus = $d['status'] ?? '';
+        $resolution = $d['resolution_notes'] ?? null;
+        $assignedTo = $d['assigned_to'] ?? null;
+
+        // Get current maintenance record
+        $cur = getDB()->prepare("SELECT * FROM facility_maintenance WHERE maintenance_id = ?");
+        $cur->execute([$maintId]);
+        $curData = $cur->fetch();
+        if (!$curData) {
+            jsonResponse(['error' => 'Maintenance record not found'], 404);
+            break;
+        }
+
+        $updates = [];
+        $params = [];
+        if ($newStatus) {
+            $updates[] = "status = ?";
+            $params[] = $newStatus;
+            if ($newStatus === 'resolved' || $newStatus === 'closed') {
+                $updates[] = "resolved_at = NOW()";
+            }
+        }
+        if ($resolution !== null) {
+            $updates[] = "resolution_notes = ?";
+            $params[] = $resolution;
+        }
+        if ($assignedTo !== null) {
+            $updates[] = "assigned_to = ?";
+            $params[] = $assignedTo;
+        }
+
+        if ($updates) {
+            $params[] = $maintId;
+            $sql = "UPDATE facility_maintenance SET " . implode(', ', $updates) . " WHERE maintenance_id = ?";
+            getDB()->prepare($sql)->execute($params);
+        }
+
+        // When resolved/closed, restore equipment and facility status
+        if (in_array($newStatus, ['resolved', 'closed'])) {
+            if ($curData['equipment_id']) {
+                getDB()->prepare("UPDATE facility_equipment SET condition_status = 'good', is_available = 1 WHERE equipment_id = ?")->execute([$curData['equipment_id']]);
+            }
+            // Check if facility has any other open maintenance tickets
+            $openCheck = getDB()->prepare("SELECT COUNT(*) FROM facility_maintenance WHERE facility_id = ? AND status IN ('open','in_progress') AND maintenance_id != ?");
+            $openCheck->execute([$curData['facility_id'], $maintId]);
+            if ($openCheck->fetchColumn() == 0) {
+                getDB()->prepare("UPDATE facilities SET status = 'available' WHERE facility_id = ? AND status = 'maintenance'")->execute([$curData['facility_id']]);
+            }
+        }
+
+        logAudit('facilities', 'UPDATE_MAINTENANCE', 'facility_maintenance', $maintId, null, ['status' => $newStatus]);
+        jsonResponse(['success' => true]);
 
     /* ───── Dashboard Stats ───── */
     case 'dashboard_stats':

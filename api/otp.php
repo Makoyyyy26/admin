@@ -217,7 +217,7 @@ function sendOTPEmail(string $otp) {
 
         // Content
         $mail->isHTML(true);
-        $mail->Subject = 'Your Login OTP — Microfinancial Admin';
+        $mail->Subject = 'Your Login OTP - Microfinancial Admin';
         $mail->Body    = getOTPEmailTemplate($otp);
         $mail->AltBody = "Your OTP code is: {$otp}\nThis code expires in " . OTP_EXPIRY . " seconds.\nDo not share this code with anyone.";
 

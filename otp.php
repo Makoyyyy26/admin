@@ -142,7 +142,7 @@
     const timerCircle = document.getElementById("timer-circle");
     const timerLabel = document.getElementById("timer-label");
 
-    const OTP_DURATION = 300; // seconds (5 minutes)
+    const OTP_DURATION = 60; // seconds (60 seconds)
     const CIRCUMFERENCE = 2 * Math.PI * 34; // matches SVG r=34
     let countdown = OTP_DURATION;
     let timerInterval = null;
